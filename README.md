@@ -15,8 +15,27 @@ Images was captured in various indoor (living rooms and bedrooms) and outdoor en
 
 
 - Plastic mold dataset: [google drive]  
-We created 360 rupture scenarios for the anticipated megathrust earthquakes in the Nankai trough (Maeda et al. (2016)) to generate simulated groundmotion (image of 512 * 512) by combining possible earthquake rupture parameters, including (a) the earthquake source area and magnitude, (b) the spatial pattern of the asperity locations, and (c) the location of the rupture initiation point, as depicted in Fig. 1. The mask is extreamly sparse (see examples below) and was created based on the location of strong motion stations, [K-NET and KiK-net](https://www.kyoshin.bosai.go.jp/kyoshin/db/index_en.html) where only 1,278 pixels are 1 (observed) and other 260,866 pixels are zero (unobserved).
+This dataset consists of 189 sets of a mirror-polished mold image taken in real factory
+production lines, a mirror map annotating mirror surface region. Table lists the breakdown number of images for each type of mold.
 
+<center>
+
+|  type  |  breakdown  |
+|:---- | :----: |
+|  movable small case  |  18  |
+|  small case  |  13  |
+|  coin case  |  21  |
+|  nameplate  |45|
+|  movable hard case | 12|
+|  hard case  |21|
+|  number tag | 41|
+|  coin dish  |18|
+
+</center>  
+
+
+### Preparation
+- Download all files from (plastic_mold_dataset[google drive] / spherical_mirror_dataset [[googl drive](https://drive.google.com/file/d/1yoguAVmbKL73_hr6GTQV552QihRqAOjh/view?usp=drive_link)])  and place them under ./data folder.
 
 ```
   data/
