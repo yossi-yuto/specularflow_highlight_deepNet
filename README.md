@@ -10,7 +10,7 @@ This reposititory provides data and codes used in the paper Combining Static Spe
 ## Dataset
 - Spherical mirror dataset: [[google drive](https://drive.google.com/file/d/1yoguAVmbKL73_hr6GTQV552QihRqAOjh/view?usp=drive_link)]  
 This dataset consists of 131 images of the spherical mirror, and the corresponding mask images. Of these, 104 were used as training data, and 27 were used for test data.
-Images was captured in various indoor (living rooms and bedrooms) and outdoor environments (garages and gardens) by changing the distance and angle between the camera and the spherical mirror so that the mirror reflects diverse textures.
+Images were captured in various indoor (living rooms and bedrooms) and outdoor environments (garages and gardens) by changing the distance and angle between the camera and the spherical mirror so that the mirror reflects diverse textures.
 
 
 
@@ -34,7 +34,24 @@ production lines, a mirror map annotating mirror surface region. Table lists the
 </center>  
 
 
-### Preparation
+<center>
+
+<table>
+  <tr>
+    <th>type</th>
+    <th>breakdown</th>
+  </tr>
+  <tr>
+    <td>movable small case</td>
+    <td>18</td>
+  </tr>
+  <!-- 他の行 -->
+</table>
+
+</center>
+
+
+### Data structure
 - Download all files from (plastic_mold_dataset[google drive] / spherical_mirror_dataset [[googl drive](https://drive.google.com/file/d/1yoguAVmbKL73_hr6GTQV552QihRqAOjh/view?usp=drive_link)])  and place them under ./data folder.
 
 ```
@@ -42,7 +59,13 @@ production lines, a mirror map annotating mirror surface region. Table lists the
     ├── plastic_mold_dataset/
     │   ├── coin_case/
     │   │   ├── image/
-    │   │   └── mask/
+    │   │   │   ├── img1.jpg
+    │   │   │   ├── img2.jpg
+    │   │   │   └── ...
+    │   │   └── mask/  
+    │   │       ├── img1.png
+    │   │       ├── img2.png
+    │   │       └── ...
     │   ├── coin_tray/
     │   │   └── ...
     │   ├── hard_case/
@@ -61,7 +84,13 @@ production lines, a mirror map annotating mirror surface region. Table lists the
     └── spherical_mirror_dataset/
         ├── test/
         │   ├── image/
-        │   └── mask/
+        │   |    ├── img1.jpg
+        │   |    ├── img2.jpg
+        │   |    └── ...
+        |   └── mask/  
+        │       ├── img1.png
+        │       ├── img2.png
+        │       └── ...
         └── train/
             └── ...
 ```
