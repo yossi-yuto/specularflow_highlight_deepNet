@@ -31,24 +31,6 @@ production lines, a mirror map annotating mirror surface region. Table lists the
 |  number tag | 41|
 |  coin dish  |18|
 
-</center>  
-
-
-<center>
-
-<table>
-  <tr>
-    <th>type</th>
-    <th>breakdown</th>
-  </tr>
-  <tr>
-    <td>movable small case</td>
-    <td>18</td>
-  </tr>
-  <!-- 他の行 -->
-</table>
-
-</center>
 
 
 ### Data structure
