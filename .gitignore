@@ -159,7 +159,5 @@ cython_debug/
 #  option (not recommended) you can uncomment the following to ignore the entire idea folder.
 #.idea/
 
-data/plastic_mold_dataset.zip
-data/plastic_mold_dataset/
-data/spherical_mirror_dataset.zip
-data/spherical_mirror_dataset/
+
+
