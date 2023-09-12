@@ -31,7 +31,7 @@ production lines, a mirror map annotating mirror surface region. Table lists the
 |  number tag | 41|
 |  coin dish  |18|
 
-
+</center>
 
 ### Data structure
 - Download all files from (plastic_mold_dataset[google drive] / spherical_mirror_dataset [[googl drive](https://drive.google.com/file/d/1yoguAVmbKL73_hr6GTQV552QihRqAOjh/view?usp=drive_link)])  and place them under ./data folder.
@@ -77,5 +77,16 @@ production lines, a mirror map annotating mirror surface region. Table lists the
             └── ...
 ```
 
-
-
+## How to run
+To train the model and test it on the spherical mirror dataset, execute the following command:
+```bash 
+source pipeline_mold.sh ${GPU_NUM} ${date}
+```
+Also, to train the model and test it using the plastic mold dataset, execute the following command:
+```bash
+source pipeline_spherical.sh ${GPU_NUM} ${date}
+```
+`${GPU_NUM}` is the device number of the GPU and `${date}` is the execution date argument. For instance, to run the code on September 12 using GPU 0 and the spherical mirror dataset, you can use this command:
+```bash
+source pipeline_spherical.sh 0 0912
+```
