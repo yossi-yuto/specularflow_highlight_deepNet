@@ -7,7 +7,7 @@ import torch.nn as nn
 import numpy as np
 from torchvision.models import resnext101_32x8d
 
-from layers import BasicConv, Basic_TransConv, Relation_Attention, Resudial_Block, Contrast_Module_Deep, CBAM
+from .layers import BasicConv, Basic_TransConv, Relation_Attention, Resudial_Block, Contrast_Module_Deep, CBAM
 
 
 class Encoder_Decoder(nn.Module):
@@ -150,9 +150,9 @@ class ZeroOutput(nn.Module):
 ###################################################################
 # ########################## NETWORK ##############################
 ###################################################################
-class SSFH(nn.Module):
+class Network(nn.Module):
     def __init__(self, rccl_zero = False, ssf_zero = False, sh_zero = False, EDF_zero = False, refine_target=False):
-        super(SSFH, self).__init__()
+        super(Network, self).__init__()
         print("\n This model is ssfh.py.")
 
         self.rccl_flag = rccl_zero

@@ -33,7 +33,7 @@ def check_strings(string, string_list):
     return False
 
 
-def train_ssfh(dataloader, model, loss_fn, metrics_fn, optimizer):
+def train(dataloader, model, loss_fn, metrics_fn, optimizer):
     model.train()
     train_loss = 0
     train_score = 0
@@ -60,7 +60,7 @@ def train_ssfh(dataloader, model, loss_fn, metrics_fn, optimizer):
             }
 
 
-def val_ssfh(dataloader, model, loss_fn, metrics_fn, output_path):
+def val(dataloader, model, loss_fn, metrics_fn, output_path):
     val_loss = 0
     val_score = 0
     val_refine_loss = 0
@@ -120,7 +120,7 @@ def val_ssfh(dataloader, model, loss_fn, metrics_fn, output_path):
             }
 
 
-def test_ssfh(test_imgs, mask_dir, model, save_dir, read_best_path):
+def test(test_imgs, mask_dir, model, save_dir, read_best_path):
     model.load_state_dict(torch.load(read_best_path))
     model.eval()
     img_trans = img_transform()

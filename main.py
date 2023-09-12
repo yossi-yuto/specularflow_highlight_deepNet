@@ -18,17 +18,17 @@ from datetime import datetime as dt
 from tqdm import tqdm
 
 from loss.dice_bce import DBCE
-from model.ssfh import SSFH
+from model.network import Network
 from dataset import SSF_SH_Dataset
 from asset import visialize
 import earlystop
-from learning_component import train_ssfh, val_ssfh, test_ssfh, plot_loss_gragh, model_param_reading, model_setting
+from learning_component import train, val, test, plot_loss_gragh, model_param_reading, model_setting
 
 
 def parse_args():
     '''コマンドライン引数'''
     parser = ArgumentParser()
-    parser.add_argument('-dataset_path', type=str, default="yushin_dataset_kinds",help="dataset path") 
+    parser.add_argument('-dataset_path', type=str, default="data/plastic_mold_dataset",help="dataset path") 
     parser.add_argument('-test_mold_type', type=str, default=None, help="except mold kind.")
     parser.add_argument('-mode', type=str, choices=['rccl', 'ssf', 'sh', 'refine', 'pmd'], required=True)
     parser.add_argument('-write_dir', type=str, required=True)
@@ -43,10 +43,9 @@ def parse_args():
 
 
 # type cross validation
-def mold_dataset():
-    args = parse_args()
+def mold_dataset(args):
     assert os.path.exists(args.dataset_path), f"Not found {args.dataset_path}"
-    assert args.test_mold_type == None, "No setting test mold type."
+    assert args.test_mold_type != None, "No setting test mold type."
     print("mold dataset make:\n")
     train_dataset = []
     val_dataset = []
@@ -79,8 +78,7 @@ def mold_dataset():
 
 
 # spherical_mirror_dataset
-def spherical_mirror_dataset():
-    args = parse_args()
+def spherical_mirror_dataset(args):
     assert os.path.exists(args.dataset_path), f"Not found {args.dataset_path}"
     train_path = os.path.join(args.dataset_path, "train")
     test_path = os.path.join(args.dataset_path, "test")
@@ -109,18 +107,20 @@ def getTrainTestCounts(dataset):
 
 def main():
     opt = parse_args()
-    
+
     """ dataset """
-    if "plastic_mold_dataset" in opt.dataset_path: 
-        train_loader, val_loader, test_imgs, test_mask_dir = mold_dataset()
-        print("Correct dataset")
-    elif "spherical_mirror_dataset" in opt.dataset_path:
-        train_loader, val_loader, test_imgs, test_mask_dir = spherical_mirror_dataset()
+    if "mold" in opt.dataset_path: 
+        train_loader, val_loader, test_imgs, test_mask_dir = mold_dataset(opt)
+        result_root = os.path.join("result/plastic_mold", opt.write_dir)
+        print("Plastic mold dataset")
+    elif "spherical" in opt.dataset_path:
+        train_loader, val_loader, test_imgs, test_mask_dir = spherical_mirror_dataset(opt)
+        result_root = os.path.join("result/spherical_mirror", opt.write_dir)
+        print("Spherical mirror dataset")
     else:
         print("Not found dataset.")
 
     """ directory structure """
-    result_root = os.path.join(f"Mold_Experiment", opt.write_dir)
     result_root_check = os.path.join(result_root, "checkpoint")
     result_root_output = os.path.join(result_root, "output")
     result_root_check_output = os.path.join(result_root, "validation_predict")
@@ -134,26 +134,26 @@ def main():
 
     """ setting model"""
     if opt.mode == "rccl":
-        model = SSFH(rccl_zero=False, ssf_zero=True, sh_zero=True, EDF_zero=True).cuda()
+        model = Network(rccl_zero=False, ssf_zero=True, sh_zero=True, EDF_zero=True).cuda()
         model = model_setting(model, rccl_freeze=False, ssf_freeze=True, sh_freeze=True, EDF_freeze=True)
 
     elif opt.mode == "ssf":
-        model = SSFH(rccl_zero=True, ssf_zero=False, sh_zero=True, EDF_zero=True).cuda()
+        model = Network(rccl_zero=True, ssf_zero=False, sh_zero=True, EDF_zero=True).cuda()
         model = model_setting(model, rccl_freeze=True, ssf_freeze=False, sh_freeze=True, EDF_freeze=True)
 
     elif opt.mode == "sh":
-        model = SSFH(rccl_zero=True, ssf_zero=True, sh_zero=False, EDF_zero=True).cuda()
+        model = Network(rccl_zero=True, ssf_zero=True, sh_zero=False, EDF_zero=True).cuda()
         model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=False, EDF_freeze=True)
 
     elif opt.mode == "refine":
-        model = SSFH(rccl_zero=False, ssf_zero=False, sh_zero=False, EDF_zero=False, refine_target=True).cuda()
+        model = Network(rccl_zero=False, ssf_zero=False, sh_zero=False, EDF_zero=False, refine_target=True).cuda()
         model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
         model = model_param_reading(model, os.path.join(result_root_check, "rccl.pth"), ["rccl"])
         model = model_param_reading(model, os.path.join(result_root_check, "ssf.pth"), ["ssf"])
         model = model_param_reading(model, os.path.join(result_root_check, "sh.pth"), ["sh"])
 
     elif opt.mode == "pmd":
-        model = SSFH(rccl_zero=False, ssf_zero=True, sh_zero=True, EDF_zero=False).cuda()
+        model = Network(rccl_zero=False, ssf_zero=True, sh_zero=True, EDF_zero=False).cuda()
         model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
         model = model_param_reading(model, os.path.join(result_root_check, "rccl.pth"), ["rccl"])
 
@@ -178,13 +178,13 @@ def main():
         print("model training... ")
         for epoch in range(opt.epochs):
             print('\nEpoch: {}'.format(epoch+1))
-            train_output = train_ssfh(train_loader, 
+            train_output = train(train_loader, 
                                             model, 
                                             loss_fn, 
                                             metrics_fn, 
                                             optimizer
                                             )
-            val_output = val_ssfh(val_loader, 
+            val_output = val(val_loader, 
                                             model, 
                                             loss_fn, 
                                             metrics_fn, 
@@ -206,7 +206,7 @@ def main():
         print("test predicting...")
         pred_dir = os.path.join(result_root_output, opt.mode)
         os.makedirs(pred_dir, exist_ok=True)
-        Fbeta, MAE =  test_ssfh(test_imgs, test_mask_dir, model, pred_dir, component_param_path)
+        Fbeta, MAE =  test(test_imgs, test_mask_dir, model, pred_dir, component_param_path)
         with open(os.path.join(result_root, "eval.txt"), mode="a") as w: 
             w.write(f"{opt.mode}:\n")
             w.write(f"Fbeta: {Fbeta}, MAE: {MAE}\n")
