@@ -12,6 +12,7 @@ def parse_arg():
     parser = ArgumentParser()
     parser.add_argument('-input_dir', type=str)
     parser.add_argument('-output_file', type=str, default="output")
+    return parser.parse_args()
 
 
 def main(args):
@@ -59,5 +60,6 @@ def main(args):
     df.to_csv(output_csv_path, index=False)
 
 if __name__ == "__main__":
-    main()
+    args = parse_arg()
+    main(args)
 
