@@ -26,6 +26,7 @@ class Encoder_Decoder(nn.Module):
         
         self.final_conv = nn.Conv2d(13+64, 1, 3, 1, 1)
         
+        self.cbam = CBAM(256)
         
     def forward(self, x): 
         # encode
@@ -33,6 +34,7 @@ class Encoder_Decoder(nn.Module):
         _ = self.pool(_)
         _ = self.conv1(_)
         _ = self.conv2(_)
+        _ = self.cbam(_)
         # decode
         _ = self.t_conv1(_)
         _ = self.t_conv2(_)

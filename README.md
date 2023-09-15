@@ -78,11 +78,11 @@ production lines, a mirror map annotating mirror surface region. Table lists the
 ```
 
 ## How to run
-To train the model and test it on the spherical mirror dataset, execute the following command:
+To train the model and test it on the plastic mold dataset, execute the following command:
 ```bash 
 source pipeline_mold.sh ${GPU_NUM} ${date}
 ```
-Also, to train the model and test it using the plastic mold dataset, execute the following command:
+Also, to train the model and test it using the spherical mirror dataset, execute the following command:
 ```bash
 source pipeline_spherical.sh ${GPU_NUM} ${date}
 ```
