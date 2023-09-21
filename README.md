@@ -8,9 +8,12 @@ This reposititory provides data and codes used in the paper Combining Static Spe
 - PyTorch>=1.7.1
 
 ## Installation
+To get started with the project, follow these steps:
+1. Clone the repository.
 ```bash
-git clone 
+git clone https://github.com/yossi-yuto/specularflow_highlight_deepNet.git
 ```
+2. Install the required packages using pip or conda.
 
 ## Dataset
 - Spherical mirror dataset: [[google drive](https://drive.google.com/file/d/1yoguAVmbKL73_hr6GTQV552QihRqAOjh/view?usp=drive_link)]  
