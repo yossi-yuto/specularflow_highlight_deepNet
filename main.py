@@ -147,15 +147,15 @@ def main():
 
     elif opt.mode == "refine":
         model = Network(rccl_zero=False, ssf_zero=False, sh_zero=False, EDF_zero=False, refine_target=True).cuda()
-        model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
         model = model_param_reading(model, os.path.join(result_root_check, "rccl.pth"), ["rccl"])
         model = model_param_reading(model, os.path.join(result_root_check, "ssf.pth"), ["ssf"])
         model = model_param_reading(model, os.path.join(result_root_check, "sh.pth"), ["sh"])
+        model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
 
     elif opt.mode == "pmd":
         model = Network(rccl_zero=False, ssf_zero=True, sh_zero=True, EDF_zero=False).cuda()
-        model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
         model = model_param_reading(model, os.path.join(result_root_check, "rccl.pth"), ["rccl"])
+        model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
 
     else:
         print("No such component.")

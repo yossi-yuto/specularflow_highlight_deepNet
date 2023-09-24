@@ -108,7 +108,7 @@ def val(dataloader, model, loss_fn, metrics_fn, output_path):
     plt.imshow(mask.view(416, 416).cpu(), cmap='gray')
     plt.title("GT", fontsize=font_size)
     plt.subplot(row, col, num_graghs + 3)
-    masking_img = torch.mul(pred_arr[0], image[0]).permute(1,2,0).numpy().astype(np.uint8)
+    masking_img = torch.mul(pred_arr[-1], rgb_img).squeeze(0).to(torch.uint8).permute(1,2,0)
     plt.imshow(masking_img)
     plt.title("detected mirror", fontsize=font_size)
     plt.axis('off')
@@ -226,3 +226,11 @@ def model_param_reading(model, read_path, read_module=['rccl', 'ssf', 'sh']):
     selected_state_dict = {key: value for key, value in state_dict.items() if check_strings(string=key, string_list=read_module)}
     model.load_state_dict(selected_state_dict, strict=False)
     return model
+
+
+# Print unfrozen_parameters.
+def print_unfrozen_params(model):
+    print("Unfrozen parameters:")
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            print(f"Layer: {name}, Parameter Size: {param.size()}")
