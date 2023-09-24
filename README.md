@@ -7,6 +7,7 @@ This reposititory provides data and codes used in the paper Combining Static Spe
 - Python 3
 - PyTorch>=1.7.1
 
+
 ## Dataset
 - Spherical mirror dataset: [[google drive](https://drive.google.com/file/d/1yoguAVmbKL73_hr6GTQV552QihRqAOjh/view?usp=drive_link)]  
 This dataset consists of 131 images of the spherical mirror, and the corresponding mask images. Of these, 104 were used as training data, and 27 were used for test data.
@@ -76,6 +77,14 @@ production lines, a mirror map annotating mirror surface region. Table lists the
         └── train/
             └── ...
 ```
+
+## Installation
+To get started with the project, follow these steps:
+1. Clone the repository.
+```bash
+git clone https://github.com/yossi-yuto/specularflow_highlight_deepNet.git
+```
+2. Install the required packages using pip or conda.
 
 ## How to run
 To train the model and test it on the plastic mold dataset, execute the following command:
