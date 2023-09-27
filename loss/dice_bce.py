@@ -15,19 +15,16 @@ class DBCE(nn.Module):
         self.dice_loss = DiceLoss()
         self.BCE_loss = nn.BCELoss()
         
-    def forward(self, pred, target, target_edge): 
+    def forward(self, pred, target, target_edge) -> tuple: 
         num_map = len(pred)
-        sum_loss = 0
+        spec_map_loss = 0
         for i in range(num_map):
             if i < num_map - 2:
-                sum_loss += self.W_s * (self.BCEwithLogitsLoss(pred[i], target) + self.dice_loss(pred[i], target))
+                spec_map_loss+= self.W_s * (self.BCEwithLogitsLoss(pred[i], target) + self.dice_loss(pred[i], target))
             if i == (num_map - 2):
                 edge_loss = self.W_b * (self.BCEwithLogitsLoss(pred[i], target_edge))
-                sum_loss += edge_loss
-            
             elif i == (num_map - 1):
                 final_loss = self.W_f * (self.BCEwithLogitsLoss(pred[i], target) + self.dice_loss(pred[i], target))
-                sum_loss += final_loss
                 
-        return sum_loss, (final_loss + edge_loss)
+        return spec_map_loss, edge_loss, final_loss 
         

@@ -153,9 +153,8 @@ class ZeroOutput(nn.Module):
 # ########################## NETWORK ##############################
 ###################################################################
 class Network(nn.Module):
-    def __init__(self, rccl_zero = False, ssf_zero = False, sh_zero = False, EDF_zero = False, refine_target=False):
+    def __init__(self, rccl_zero = False, ssf_zero = False, sh_zero = False, EDF_zero = False, refine_module = False):
         super(Network, self).__init__()
-        print("\n This model is ssfh.py.")
 
         self.rccl_flag = rccl_zero
         self.ssf_flag = ssf_zero
@@ -245,10 +244,10 @@ class Network(nn.Module):
         self.sh_layer1_predict = nn.Conv2d(64, 1, 3, 1, 1)
         
         # Refinement Network
-        if refine_target:
+        if refine_module:
             self.tmp_refinement = Encoder_Decoder(3 + 4 * 3 + 1)
         else:
-            self.tmp_refinement =  nn.Conv2d(3+4*3+1, 1, 1, 1, 0)
+            self.tmp_refinement =  nn.Conv2d(4*3+1, 1, 1, 1, 0)
         
         
         for m in self.modules():
@@ -404,7 +403,9 @@ class Network(nn.Module):
         '''Final Mirror Map'''
         final_features = torch.cat((layer0_edge, layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict, layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict, sh4_predict, sh3_predict, sh2_predict, sh1_predict), 1) 
         # final_predict = self.tmp_refinement(x, final_features)
-        final_predict = self.tmp_refinement(torch.cat((x, final_features), 1))
+        # final_predict = self.tmp_refinement(torch.cat((x, final_features), 1))
+        # final_predict = self.tmp_refinement(final_features)
+        final_predict = torch.mean(final_features, dim=1, keepdim=True)
         
 
         if self.training == True:

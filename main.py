@@ -38,6 +38,8 @@ def parse_args():
     parser.add_argument('-batch_size', type=int, default=5, help='Defalut:5')
     parser.add_argument('-resize', type=int, default=416 , help='Default:416')
     parser.add_argument("-patient", type=int, default=10, help="Early Stopping . the number of epoch. defalut 10")
+    # tmp
+    parser.add_argument('-final_loss_weight', type=int, default=4, help="Refinement Loss weight.")
 
     return parser.parse_args()
 
@@ -146,7 +148,7 @@ def main():
         model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=False, EDF_freeze=True)
 
     elif opt.mode == "refine":
-        model = Network(rccl_zero=False, ssf_zero=False, sh_zero=False, EDF_zero=False, refine_target=True).cuda()
+        model = Network(rccl_zero=False, ssf_zero=False, sh_zero=False, EDF_zero=False, refine_module=False).cuda()
         model = model_param_reading(model, os.path.join(result_root_check, "rccl.pth"), ["rccl"])
         model = model_param_reading(model, os.path.join(result_root_check, "ssf.pth"), ["ssf"])
         model = model_param_reading(model, os.path.join(result_root_check, "sh.pth"), ["sh"])
@@ -159,10 +161,13 @@ def main():
 
     else:
         print("No such component.")
-    
+
     """ learning setting """
     if opt.train:
-        loss_fn = DBCE(W_s=1, W_b=5, W_f=4)
+        if opt.mode == "refine":
+            loss_fn = DBCE(W_s=0, W_b=5, W_f=1)
+        else:
+            loss_fn = DBCE(W_s=1, W_b=0, W_f=1)
         metrics_fn = BinaryFBetaScore(beta=0.5)
         es = earlystop.EarlyStopping(
                                     verbose=True,

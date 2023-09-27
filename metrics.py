@@ -9,3 +9,12 @@ def calc_maxFbeta(true_1d, pred_1d):
     denom = (0.3 * precisions) + recalls
     fbetas = np.divide(numerator, denom, out=np.zeros_like(denom), where=(denom!=0))
     return np.max(fbetas)
+
+
+def get_maxFscore_and_threshold(true_1d, pred_1d) -> tuple:
+    assert len(true_1d.shape) == 1 and len(pred_1d.shape) == 1, f"No format input.shape is not 1 dimension."
+    precisions, recalls, thres = precision_recall_curve(true_1d, pred_1d)
+    numerator = (1 + 0.3) * (precisions * recalls)
+    denom = (0.3 * precisions) + recalls
+    fbetas = np.divide(numerator, denom, out=np.zeros_like(denom), where=(denom!=0))
+    return np.max(fbetas), thres[np.argmax(fbetas)]
