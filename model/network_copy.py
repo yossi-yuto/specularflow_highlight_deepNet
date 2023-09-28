@@ -404,8 +404,8 @@ class Network(nn.Module):
         final_features = torch.cat((layer0_edge, layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict, layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict, sh4_predict, sh3_predict, sh2_predict, sh1_predict), 1) 
         # final_predict = self.tmp_refinement(x, final_features)
         # final_predict = self.tmp_refinement(torch.cat((x, final_features), 1))
-        # final_predict = self.tmp_refinement(final_features)
-        final_predict = torch.mean(final_features, dim=1, keepdim=True)
+        final_predict = self.tmp_refinement(final_features)
+        pdb.set_trace()
         
         if self.training == True:
             return layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict, layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict, sh4_predict, sh3_predict, sh2_predict, sh1_predict, layer0_edge, final_predict

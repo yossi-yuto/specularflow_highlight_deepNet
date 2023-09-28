@@ -13,7 +13,7 @@ import pydensecrf.densecrf as dcrf
 import torchvision.transforms as transform
 
 
-def img_transform(resize=(416,416)):
+def img_transform(resize=(416,416)) -> transform.Compose:
     transform_ = transform.Compose([
         transform.ToTensor(),
         transform.Resize(resize),
@@ -22,7 +22,7 @@ def img_transform(resize=(416,416)):
     return transform_
 
 
-def mask_transform(resize=(416,416)):
+def mask_transform(resize=(416,416))-> transform.Compose:
     transform_ = transform.Compose([
         transform.ToTensor(),
         transform.Resize((resize)),
@@ -30,7 +30,7 @@ def mask_transform(resize=(416,416)):
     return transform_
 
 
-def hsv_transform(resize=(416,416)):
+def hsv_transform(resize=(416,416))-> transform.Compose:
     transform_ = transform.Compose([
         transform.ToTensor(),
         transform.Resize((resize)),

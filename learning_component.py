@@ -7,9 +7,12 @@ import math
 from argparse import ArgumentParser
 
 import torch
-from torch import optim
-import torch.nn as nn
+import torch.nn.functional as F
+torch.nn.functional
 import numpy as np
+
+
+import torchvision.transforms as transform
 from torch.autograd import Variable
 from torchvision import transforms
 from torchmetrics.classification import BinaryJaccardIndex
@@ -19,8 +22,9 @@ from PIL import Image
 from tqdm import tqdm
 from sklearn.metrics import mean_absolute_error
 
-from asset import crf_refine, visialize,convert_tensor_to_pil, img_transform, mask_transform, hsv_transform 
+from asset import crf_refine, visialize,convert_tensor_to_pil, img_transform, hsv_transform
 from metrics import get_maxFscore_and_threshold
+
 
 def image_mask_path(data_dir):
     return os.path.join(data_dir, "image"), os.path.join(data_dir, "mask")
@@ -134,8 +138,32 @@ def val(dataloader, model, loss_fn, metrics_fn, output_path):
             }
 
 
+def load_and_process_image(img_path, img_trans=img_transform(), hsv_trans=hsv_transform()) -> tuple:
+    # Load image
+    img = Image.open(img_path)
+    # Variable
+    w, h = img.size
+    img_var = Variable(img_trans(img).unsqueeze(0)).cuda()
+    sv_var = Variable(hsv_trans(img.convert("HSV"))[1:,:,:].unsqueeze(0)).cuda()
+    
+    return img_var, sv_var
+
+
+def post_resize_and_convert(output_list, resize=None) -> list:
+    if resize == None:
+        raise("No setting resize.")
+    processed_outmaps = []
+    for i, out_map in enumerate(output_list):
+        _ = F.interpolate(out_map.cpu(), size=resize, mode='bilinear', align_corners=True)
+        _ = torch.squeeze(_)
+        _ = (_ * 255).numpy().astype(np.uint8)
+        processed_outmaps.append(_)
+    return processed_outmaps
+
+
 def test(test_imgs, mask_dir, model, save_dir, read_best_path):
     model.load_state_dict(torch.load(read_best_path))
+    print(f"Load paramters -> {read_best_path}")
     model.eval()
     img_trans = img_transform()
     hsv_trans = hsv_transform()
@@ -152,15 +180,19 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             gt = np.array(mask.convert('1')).astype(int)
             # Variable
             w, h = img.size
-            img_var = Variable(img_trans(img).unsqueeze(0)).cuda()
-            sv_var = Variable(hsv_trans(img.convert("HSV"))[1:,:,:].unsqueeze(0)).cuda()
+            img_var = img_trans(img).unsqueeze(0).cuda()
+            sv_var = hsv_trans(img.convert("HSV"))[1:,:,:].unsqueeze(0).cuda()
             # Predict
-            output_list = list(model((img_var.cuda(), sv_var.cuda())))
+            origin_output_list = list(model((img_var.cuda(), sv_var.cuda())))
             # Post processing
-            for i in range(len(output_list)): #モデルの出力のデータ型を変更
-                output_list[i] = output_list[i].data.squeeze(0).cpu()
-                output_list[i] = np.array(transforms.Resize((h,w))(to_pil(output_list[i])))
-            final = crf_refine(np.array(img.convert("RGB")), output_list[-1])
+            output_list = post_resize_and_convert(origin_output_list, resize=(h, w))
+            print("Predict...")
+            
+            # for i in range(len(output_list)): 
+            #     output_list[i] = output_list[i].squeeze(0).cpu()
+            #     output_list[i] = np.array(transforms.Resize((h,w))(to_pil(output_list[i])))
+            # final = crf_refine(np.array(img.convert("RGB")), output_list[-1])
+            final = output_list[-1]
             # Save final predict map
             output_file_path = os.path.join(save_dir, filename)
             print(f"file name: {output_file_path}")
@@ -168,8 +200,10 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             masking = (np.array(img.convert("RGB")) / 255.) * (final[:,:,np.newaxis] / 255.)
             # Calucation scores
             pred_1d = (final / 255.).flatten()
-            true_1d = (gt / 255).astype(int).flatten()
+            true_1d = gt.flatten()
             max_Fscore, thres = get_maxFscore_and_threshold(true_1d, pred_1d)
+            if os.path.basename(img_path) == "CIMG7862.jpg":
+                pdb.set_trace()
             max_Fbeta_list.append(max_Fscore)
             MAE_list.append(mean_absolute_error(true_1d, pred_1d))
             thres_final = np.zeros_like(final)
@@ -188,10 +222,10 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
                 plt.subplot(row, col, i + 1)
                 title = ""
                 # plot image
-                if (i < num_pred_images) or (i == 14):
-                    plt.imshow(all_images[i], cmap="gray")
-                else:
+                if (i == 14) or (i == 16):
                     plt.imshow(all_images[i])
+                else:
+                    plt.imshow(all_images[i], cmap="gray")
                 # write titles
                 if i < 4:
                     title = f"RCCL-{4 - i}"
@@ -214,7 +248,7 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
                 plt.title(title, fontsize=font_size)
                 plt.axis('off')
             
-            output_file_name = dt.now().strftime('%m-%d_%H') + "_" + output_file_name + "_featmap.png"
+            output_file_name = dt.now().strftime('%m-%d_%H') + "_" + os.path.basename(img_path).replace(".jpg", "featmap.png")
             plt.savefig(os.path.join(save_dir, output_file_name))
             plt.close()
 
