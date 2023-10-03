@@ -13,7 +13,7 @@ class DBCE(nn.Module):
         # loss obeject
         self.BCEwithLogitsLoss = nn.BCEWithLogitsLoss() 
         self.dice_loss = DiceLoss()
-        self.BCE_loss = nn.BCELoss()
+        # self.BCE_loss = nn.BCELoss()
         
     def forward(self, pred, target, target_edge) -> tuple: 
         num_map = len(pred)

@@ -37,7 +37,7 @@ def check_strings(string, string_list):
     return False
 
 
-def train(dataloader, model, loss_fn, metrics_fn, optimizer, refine_non_minus=False):
+def train(dataloader, model, loss_fn, metrics_fn, optimizer):
     model.train()
     train_loss = 0
     train_score = 0
@@ -51,11 +51,6 @@ def train(dataloader, model, loss_fn, metrics_fn, optimizer, refine_non_minus=Fa
         spec_map_loss, edge_loss, refine_loss = loss_fn(pred, target, target_edge)
         loss = spec_map_loss + edge_loss + refine_loss
         loss.backward()
-        
-        # non-negative constraint on the weight
-        if refine_non_minus:
-            with torch.no_grad():
-                model.tmp_refinement.weight.clamp_(min=0)
         
         train_loss += loss.detach().item()
         train_score += metrics_fn(torch.sigmoid(pred[-1]).cpu(), mask.int()).item()
@@ -155,16 +150,14 @@ def load_and_process_image(img_path, img_trans=img_transform(), hsv_trans=hsv_tr
 
 
 def post_resize_and_convert(output_list, resize=None) -> list:
-    if resize is None:
-        raise ValueError("No setting resize.")
+    if resize == None:
+        raise("No setting resize.")
     processed_outmaps = []
     for i, out_map in enumerate(output_list):
-        out_map_cpu = out_map.cpu()
-        out_map_resized = F.interpolate(out_map_cpu, size=resize, mode='bilinear', align_corners=True)
-        out_map_squeezed = torch.squeeze(out_map_resized)
-        out_map_final = (out_map_squeezed * 255.).numpy().astype(np.uint8)
-        processed_outmaps.append(out_map_final)
-        
+        _ = F.interpolate(out_map.cpu(), size=resize, mode='bilinear', align_corners=True)
+        _ = torch.squeeze(_)
+        _ = (_ * 255).numpy().astype(np.uint8)
+        processed_outmaps.append(_)
     return processed_outmaps
 
 
@@ -172,19 +165,14 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
     model.load_state_dict(torch.load(read_best_path))
     print(f"Load paramters -> {read_best_path}")
     model.eval()
-    
     img_trans = img_transform()
     hsv_trans = hsv_transform()
-
+    to_pil = transforms.ToPILImage()
     max_Fbeta_list = []
     MAE_list = []
     with torch.no_grad():
         for img_path in tqdm(test_imgs):
             print(f"image name: {img_path}")
-            
-            # if os.path.basename(img_path) != "CIMG7899.jpg":
-            #     continue
-            
             # Load image
             img = Image.open(img_path)
             filename = os.path.basename(img_path).replace(".jpg", ".png")
@@ -196,38 +184,32 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             sv_var = hsv_trans(img.convert("HSV"))[1:,:,:].unsqueeze(0).cuda()
             # Predict
             origin_output_list = list(model((img_var.cuda(), sv_var.cuda())))
-            # origin_output_list = [torch.sigmoid(out_map) for out_map in origin_output_list]
-            
-            # for i in range(len(origin_output_list)):
-            #     print(f"origin_output_list[{i}_sig][400, 400]]: {origin_output_list[i][:, :, 400, 400]}")
-
-            # print("Raw value.")
-            # for i in range(len(origin_output_list)):
-            #     origin_output_list[i] = torch.sigmoid(origin_output_list[i])
-            #     print(f"origin_output_list[{i}_raw][400, 400]: {origin_output_list[i][:, :, 400, 400]}")
-            
-            
             # Post processing
             output_list = post_resize_and_convert(origin_output_list, resize=(h, w))
             print("Predict...")
             
-            # pdb.set_trace()
-
+            # for i in range(len(output_list)): 
+            #     output_list[i] = output_list[i].squeeze(0).cpu()
+            #     output_list[i] = np.array(transforms.Resize((h,w))(to_pil(output_list[i])))
+            # final = crf_refine(np.array(img.convert("RGB")), output_list[-1])
+            final = output_list[-1]
             # Save final predict map
             output_file_path = os.path.join(save_dir, filename)
             print(f"file name: {output_file_path}")
-            Image.fromarray(output_list[-1]).save(output_file_path)
-            masking = (np.array(img.convert("RGB")) / 255.) * (output_list[-1][:,:,np.newaxis] / 255.)
-
+            Image.fromarray(final).save(output_file_path)
+            masking = (np.array(img.convert("RGB")) / 255.) * (final[:,:,np.newaxis] / 255.)
             # Calucation scores
-            pred_1d = (output_list[-1] / 255.).flatten()
+            pred_1d = (final / 255.).flatten()
             true_1d = gt.flatten()
             max_Fscore, thres = get_maxFscore_and_threshold(true_1d, pred_1d)
+            # if os.path.basename(img_path) == "CIMG7901.jpg":
+            #     pdb.set_trace()
             max_Fbeta_list.append(max_Fscore)
             MAE_list.append(mean_absolute_error(true_1d, pred_1d))
-            thres_final = np.zeros_like(output_list[-1])
-            thres_final[output_list[-1] > (thres * 255.)] = 255
+            thres_final = np.zeros_like(final)
+            thres_final[final > (thres * 255.)] = 255
             # Gragh plot
+            num_pred_images = len(output_list)
             all_images = output_list + [img, mask, masking, thres_final]
             num_images = len(all_images)
             
@@ -266,15 +248,9 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
                 plt.title(title, fontsize=font_size)
                 plt.axis('off')
             
-            # Save analysis map 
-            current_time = dt.now().strftime('%m-%d-%H')
-            output_file_name = current_time + "_" + os.path.basename(img_path).replace(".jpg", "_featmap.png")
-            output_analysis_path = os.path.join(save_dir, output_file_name)
-            print(f"analysis_file: {output_analysis_path}")
-            plt.savefig(output_analysis_path)
+            output_file_name = dt.now().strftime('%m-%d-%H') + "_" + os.path.basename(img_path).replace(".jpg", "_featmap.png")
+            plt.savefig(os.path.join(save_dir, output_file_name))
             plt.close()
-            
-            # pdb.set_trace()
 
         avg_f_beta = statistics.mean(max_Fbeta_list)
         avg_MAE = statistics.mean(MAE_list)

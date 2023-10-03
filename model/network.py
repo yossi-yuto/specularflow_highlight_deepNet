@@ -404,23 +404,28 @@ class Network(nn.Module):
         final_features = torch.cat((layer0_edge, layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict, layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict, sh4_predict, sh3_predict, sh2_predict, sh1_predict), 1) 
         # final_predict = self.tmp_refinement(x, final_features)
         # final_predict = self.tmp_refinement(torch.cat((x, final_features), 1))
-        # final_predict = self.tmp_refinement(final_features)
-        final_predict = torch.mean(final_features, dim=1, keepdim=True)
+        final_predict = self.tmp_refinement(final_features)
+        # final_predict = torch.mean(final_features, dim=1, keepdim=True)
         
-        if self.training == True:
-            return layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict, layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict, sh4_predict, sh3_predict, sh2_predict, sh1_predict, layer0_edge, final_predict
+        # Return
+        rccl_layers = [layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict]
+        ssf_layers = [layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict]
+        sh_layers = [sh4_predict, sh3_predict, sh2_predict, sh1_predict]
+        others = [layer0_edge, final_predict]
+        # for i in (*rccl_layers, *ssf_layers, *sh_layers, *others):
+        #     print(i[:,:,400,0])
+        # pdb.set_trace()
+        rccl_layers = [self.apply_sigmoid_if_needed(layer) for layer in rccl_layers]
+        ssf_layers = [self.apply_sigmoid_if_needed(layer) for layer in ssf_layers]
+        sh_layers = [self.apply_sigmoid_if_needed(layer) for layer in sh_layers]
+        others = [self.apply_sigmoid_if_needed(layer) for layer in others]
         
-        return torch.sigmoid(layer4_rccl_predict), torch.sigmoid(layer3_rccl_predict), torch.sigmoid(layer2_rccl_predict), torch.sigmoid(layer1_rccl_predict), torch.sigmoid(layer4_ssf_predict), torch.sigmoid(layer3_ssf_predict), torch.sigmoid(layer2_ssf_predict), torch.sigmoid(layer1_ssf_predict), torch.sigmoid(sh4_predict), torch.sigmoid(sh3_predict), torch.sigmoid(sh2_predict), torch.sigmoid(sh1_predict), torch.sigmoid(layer0_edge), torch.sigmoid(final_predict)
-        
-    def reset_tmp_parameters(self):
-        self.tmp_edge_extract = nn.Sequential(nn.Conv2d(256, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.Conv2d(128, 64, 3, 1, 1), nn.BatchNorm2d(64)) # layer1
-        self.tmp_edge_predict = nn.Sequential(nn.Conv2d(64+512*3, 1, 3, 1, 1))
-        self.tmp_refinement = Refinement_Net(3+1+4*3)
-        self.tmp_edge_extract = self.tmp_edge_extract.cuda()
-        self.tmp_edge_predict = self.tmp_edge_predict.cuda()
-        self.tmp_refinement = self.tmp_refinement.cuda()
+        return (*rccl_layers, *ssf_layers, *sh_layers, *others)
     
     def output_zero(self, x):
         return x * torch.zeros_like(x)
+    
+    def apply_sigmoid_if_needed(self, tensor):
+        return torch.sigmoid(tensor) if not self.training else tensor
 
 
