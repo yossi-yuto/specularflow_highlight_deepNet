@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 from datetime import datetime as dt
 from tqdm import tqdm
 
-from loss.dice_bce import LossComponent, Loss_Refine_EDF
+from loss.dice_bce import DBCE
 from model.network import Network
 from dataset import SSF_SH_Dataset
 from asset import visialize
@@ -69,6 +69,7 @@ def mold_dataset(args):
             train_dataset.append(t_dataset)
             val_dataset.append(v_dataset)
             print(f"{mold_type} <- learning, train:{train_size}, val:{val_size}")
+            
     train_dataset = ConcatDataset(train_dataset)
     val_dataset = ConcatDataset(val_dataset)
     print(f"train: {len(train_dataset)}, valid: {len(val_dataset)}")
@@ -146,22 +147,25 @@ def main():
 
     """ setting model"""
     if opt.mode == "rccl":
-        model = Network(rccl_learn=True).cuda()
+        model = Network(rccl_zero=False, ssf_zero=True, sh_zero=True, EDF_zero=True).cuda()
         model = model_setting(model, rccl_freeze=False, ssf_freeze=True, sh_freeze=True, EDF_freeze=True)
 
     elif opt.mode == "ssf":
-        model = Network(ssf_learn=True).cuda()
+        model = Network(rccl_zero=True, ssf_zero=False, sh_zero=True, EDF_zero=True).cuda()
         model = model_setting(model, rccl_freeze=True, ssf_freeze=False, sh_freeze=True, EDF_freeze=True)
 
     elif opt.mode == "sh":
-        model = Network(sh_learn=True).cuda()
+        model = Network(rccl_zero=True, ssf_zero=True, sh_zero=False, EDF_zero=True).cuda()
         model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=False, EDF_freeze=True)
 
     elif opt.mode == "refine":
-        model = Network().cuda()
+        model = Network(rccl_zero=False, ssf_zero=False, sh_zero=False, EDF_zero=False).cuda()
         if opt.read_weight_path:
             result_root_check = check_weight_path(result_dir, opt.read_weight_path)
-
+        # model = model_param_reading(model, os.path.join(result_root_check, "rccl.pth"), ["rccl"])
+        # model = model_param_reading(model, os.path.join(result_root_check, "ssf.pth"), ["ssf"])
+        # model = model_param_reading(model, os.path.join(result_root_check, "sh.pth"), ["sh"])
+        
         rccl_param_path = os.path.join(result_root_check, "rccl.pth") 
         ssf_param_path = os.path.join(result_root_check, "ssf.pth") 
         sh_param_path = os.path.join(result_root_check, "sh.pth") 
@@ -182,10 +186,10 @@ def main():
 
     """ Learning phase """
     if opt.train:
-        if (opt.mode == "refine") or (opt.mode == "pmd"):
-            loss_fn = Loss_Refine_EDF(W_edge=5, W_final=1)
+        if opt.mode == "refine":
+            loss_fn = DBCE(W_s=0, W_b=5, W_f=1)
         else:
-            loss_fn = LossComponent(W_map=1, W_final=1)
+            loss_fn = DBCE(W_s=1, W_b=0, W_f=1)
         metrics_fn = BinaryFBetaScore(beta=0.5)
         es = earlystop.EarlyStopping(
                                     verbose=True,
@@ -217,9 +221,8 @@ def main():
             val_loss.append(val_output["mean_refine_loss"])
             val_metrics.append(val_output["mean_metrics"])
             if epoch % 5 == 0:
-                save_loss_gragh_path = os.path.join(result_root_plot, f"{opt.mode}.png")
-                print(save_loss_gragh_path)
-                plot_loss_gragh(train_loss, val_loss, train_metrics, val_metrics, save_loss_gragh_path)
+                plot_loss_gragh(train_loss, val_loss, train_metrics, val_metrics, 
+                                os.path.join(result_root_plot, f"{opt.mode}.png"))
             # es(v_loss, model)
             es(val_output["mean_refine_loss"], model)
             if es.early_stop:

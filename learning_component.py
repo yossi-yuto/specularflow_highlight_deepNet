@@ -37,7 +37,7 @@ def check_strings(string, string_list):
     return False
 
 
-def train(dataloader, model, loss_fn, metrics_fn, optimizer, refine_non_minus=False):
+def train(dataloader, model, loss_fn, metrics_fn, optimizer):
     model.train()
     train_loss = 0
     train_score = 0
@@ -48,18 +48,12 @@ def train(dataloader, model, loss_fn, metrics_fn, optimizer, refine_non_minus=Fa
         target = mask.cuda()
         target_edge = edge.cuda() 
         pred = model(input)
-        spec_map_loss, edge_loss, refine_loss = loss_fn(pred, target, target_edge)
-        loss = spec_map_loss + edge_loss + refine_loss
+        loss = loss_fn(pred, target, target_edge)
         loss.backward()
-        
-        # non-negative constraint on the weight
-        if refine_non_minus:
-            with torch.no_grad():
-                model.tmp_refinement.weight.clamp_(min=0)
         
         train_loss += loss.detach().item()
         train_score += metrics_fn(torch.sigmoid(pred[-1]).cpu(), mask.int()).item()
-        train_refine_loss += refine_loss.detach().item()
+        train_refine_loss += loss.detach().item()
         
         optimizer.step()
     # Average loss
@@ -84,12 +78,11 @@ def val(dataloader, model, loss_fn, metrics_fn, output_path):
             target = mask.cuda()
             target_edge = edge.cuda()
             
-            spec_map_loss, edge_loss, refine_loss = loss_fn(pred, target, target_edge)  
-            loss = spec_map_loss + edge_loss + refine_loss
+            loss = loss_fn(pred, target, target_edge)  
             
-            val_loss += loss.item()   
+            val_loss += loss.detach().item()   
             val_score += metrics_fn(torch.sigmoid(pred[-1]).cpu(), mask.int()).item()
-            val_refine_loss += refine_loss.item()
+            val_refine_loss += loss.detach().item()
 
     m_loss = val_loss / len(dataloader)
     m_score = val_score / len(dataloader)
@@ -348,6 +341,35 @@ def model_param_reading(model, read_path, read_module=['rccl', 'ssf', 'sh']):
     model.load_state_dict(selected_state_dict, strict=False)
     return model
 
+
+def load_rccl_ssf_sh_and_refine_params(model, rccl_param_path, ssf_param_path, sh_param_path):
+    
+    param_dict = {}
+    param_dict['rccl'] = rccl_param_path
+    param_dict['ssf'] = ssf_param_path
+    param_dict['sh'] = sh_param_path
+    
+    for compo_name, param_path in param_dict.items():
+        
+        if not os.path.exists(param_path):
+            raise FileNotFoundError(f"Found no file :{param_path}")    
+        
+        # Read parameters
+        print(f"Load {compo_name} parameter -> {param_path}")
+        state_dict = torch.load(param_path)
+        
+        # Filter parameters that are relevant for the current component
+        selected_state_dict = {key: value for key, value in state_dict.items() if check_strings(string=key, string_list=[compo_name])}
+        
+        # # Add the refinement parameter
+        # refine_weight= f'{compo_name}_refine.weight'
+        # refine_bias = f"{compo_name}_refine.bias"
+        # selected_state_dict[refine_weight] = state_dict['tmp_refinement.weight']
+        # selected_state_dict[refine_bias] = state_dict['tmp_refinement.bias']
+
+        model.load_state_dict(selected_state_dict, strict=False)
+
+    return model
 
 # Print unfrozen_parameters.
 def print_unfrozen_params(model):

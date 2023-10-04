@@ -153,12 +153,13 @@ class ZeroOutput(nn.Module):
 # ########################## NETWORK ##############################
 ###################################################################
 class Network(nn.Module):
-    def __init__(self, rccl_learn = False, ssf_learn = False, sh_learn = False):
+    def __init__(self, rccl_zero = False, ssf_zero = False, sh_zero = False, EDF_zero = False):
         super(Network, self).__init__()
 
-        self.rccl_learn = rccl_learn
-        self.ssf_learn = ssf_learn
-        self.sh_learn = sh_learn
+        self.rccl_flag = rccl_zero
+        self.ssf_flag = ssf_zero
+        self.sh_flag = sh_zero
+        self.edf_flag = EDF_zero
         
         resnext = resnext101_32x8d(pretrained=True, progress=True)
         for param in resnext.parameters():
@@ -170,7 +171,11 @@ class Network(nn.Module):
         self.layer3 = net_list[6] #1024
         self.layer4 = net_list[7] #2048
         
-        ''' RCCL '''
+        '''EDF'''
+        self.tmp_edge_extract = nn.Sequential(nn.Conv2d(256, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.Conv2d(128, 64, 3, 1, 1), nn.BatchNorm2d(64)) # layer1
+        self.tmp_edge_predict = nn.Sequential(nn.Conv2d(64+512*3, 1, 3, 1, 1))
+
+        '''PMDNet'''
         self.rccl_contrast_4 = Contrast_Module_Deep(2048,d1=2, d2=4) # 2048x 12x12
         self.rccl_contrast_3 = Contrast_Module_Deep(1024,d1=4, d2=8) # 1024x 24x24
         self.rccl_contrast_2 = Contrast_Module_Deep(512, d1=4, d2=8) # 512x 48x48
@@ -238,17 +243,13 @@ class Network(nn.Module):
         self.sh_layer2_predict = nn.Conv2d(128, 1, 3, 1, 1)
         self.sh_layer1_predict = nn.Conv2d(64, 1, 3, 1, 1)
         
-        """ EDF """
-        self.tmp_edge_extract = nn.Sequential(nn.Conv2d(256, 128, 3, 1, 1), nn.BatchNorm2d(128), nn.Conv2d(128, 64, 3, 1, 1), nn.BatchNorm2d(64)) # layer1
-        self.tmp_edge_predict = nn.Sequential(nn.Conv2d(64+512*3, 1, 3, 1, 1))
-        
-        """ Refinement Network """
+        # Refinement Network
         self.rccl_refine = nn.Conv2d(4, 1, 1, 1, 0)
         self.ssf_refine = nn.Conv2d(4, 1, 1, 1, 0) 
         self.sh_refine = nn.Conv2d(4, 1, 1, 1, 0) 
         
         self.refine = nn.Conv2d(4, 1, 1, 1, 0)
-
+        
         
         for m in self.modules():
             if isinstance(m, nn.ReLU):
@@ -264,7 +265,7 @@ class Network(nn.Module):
         layer3 = self.layer3(layer2) # 1024, 26, 26
         layer4 = self.layer4(layer3) # 2048, 13, 13
 
-        ''' RCCL '''
+        '''PMD'''
         contrast_4 = self.rccl_contrast_4(layer4)
         cc_att_map_4 = self.rccl_ra_4(layer4)
         final_contrast_4 = contrast_4 * cc_att_map_4
@@ -300,18 +301,6 @@ class Network(nn.Module):
         up_1 = self.rccl_up_1(final_contrast_1)
         cbam_1 = self.rccl_cbam_1(up_1)
         layer1_rccl_predict = self.rccl_layer1_predict(cbam_1)
-        
-        '''Intermidiate Mirror Map'''
-        layer4_rccl_predict = F.interpolate(layer4_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
-        layer3_rccl_predict = F.interpolate(layer3_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
-        layer2_rccl_predict = F.interpolate(layer2_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
-        layer1_rccl_predict = F.interpolate(layer1_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
-        
-        rccl_predicts = torch.cat([layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict], 1)
-        rccl_refine = self.rccl_refine(rccl_predicts)
-        
-        if self.rccl_learn:
-            return layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict, rccl_refine
 
         '''SSF'''
         ssf_4 = self.ssf_layer4(layer4)
@@ -337,17 +326,6 @@ class Network(nn.Module):
         ssf_cbam1 = self.ssf_cbam_1(ssf_up1)
         layer1_ssf_predict = self.ssf_layer1_predict(ssf_cbam1)
         
-        layer4_ssf_predict = F.interpolate(layer4_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True)
-        layer3_ssf_predict = F.interpolate(layer3_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
-        layer2_ssf_predict = F.interpolate(layer2_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
-        layer1_ssf_predict = F.interpolate(layer1_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True)
-        
-        ssf_predicts = torch.cat([layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict], 1)
-        ssf_refine = self.ssf_refine(ssf_predicts)
-        
-        if self.ssf_learn:
-            return layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict, ssf_refine 
-        
         ''' Specualr Highlight'''
         highlight_4 = self.sh_layer4(layer4, sv)
         highlight_4_up = self.sh_up_4(highlight_4)
@@ -372,16 +350,46 @@ class Network(nn.Module):
         sh_cbam_1 = self.sh_cbam_1(highlight_1_up)
         sh1_predict = self.sh_layer1_predict(sh_cbam_1)
         
+        '''Intermidiate Mirror Map'''
+        
+        layer4_rccl_predict = F.interpolate(layer4_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+        layer3_rccl_predict = F.interpolate(layer3_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+        layer2_rccl_predict = F.interpolate(layer2_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+        layer1_rccl_predict = F.interpolate(layer1_rccl_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+        
+        '''Intermidiate SSF Map'''
+        layer4_ssf_predict = F.interpolate(layer4_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True)
+        layer3_ssf_predict = F.interpolate(layer3_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+        layer2_ssf_predict = F.interpolate(layer2_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+        layer1_ssf_predict = F.interpolate(layer1_ssf_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+        
         '''Intermidiate SH Map'''
         sh4_predict = F.interpolate(sh4_predict, size=x.size()[2:], mode='bilinear', align_corners=True)
         sh3_predict = F.interpolate(sh3_predict, size=x.size()[2:], mode='bilinear', align_corners=True)
         sh2_predict = F.interpolate(sh2_predict, size=x.size()[2:], mode='bilinear', align_corners=True)
-        sh1_predict = F.interpolate(sh1_predict, size=x.size()[2:], mode='bilinear', align_corners=True)
-        sh_predicts = torch.cat([sh4_predict, sh3_predict, sh2_predict, sh1_predict], 1)
-        sh_refine = self.sh_refine(sh_predicts)
-        
-        if self.sh_learn:
-            return sh4_predict, sh3_predict, sh2_predict, sh1_predict, sh_refine 
+        sh1_predict = F.interpolate(sh1_predict, size=x.size()[2:], mode='bilinear', align_corners=True) 
+    
+        # 個別の特徴抽出器を学習させる目的
+        if self.rccl_flag:
+            layer4_rccl_predict = self.output_zero(layer4_rccl_predict)
+            layer3_rccl_predict = self.output_zero(layer3_rccl_predict)
+            layer2_rccl_predict = self.output_zero(layer2_rccl_predict)
+            layer1_rccl_predict = self.output_zero(layer1_rccl_predict)
+            cbam_4 = self.output_zero(cbam_4)
+
+        if self.ssf_flag:
+            layer4_ssf_predict = self.output_zero(layer4_ssf_predict)
+            layer3_ssf_predict = self.output_zero(layer3_ssf_predict)
+            layer2_ssf_predict = self.output_zero(layer2_ssf_predict)
+            layer1_ssf_predict = self.output_zero(layer1_ssf_predict)
+            ssf_cbam4 = self.output_zero(ssf_cbam4)
+
+        if self.sh_flag:
+            sh4_predict = self.output_zero(sh4_predict) 
+            sh3_predict = self.output_zero(sh3_predict) 
+            sh2_predict = self.output_zero(sh2_predict) 
+            sh1_predict = self.output_zero(sh1_predict) 
+            sh_cbam_4 = self.output_zero(sh_cbam_4) 
 
         '''Edge'''
         edge_feature = self.tmp_edge_extract(layer1)
@@ -389,25 +397,43 @@ class Network(nn.Module):
         layer4_edge_feature = F.interpolate(layer4_features, size=edge_feature.size()[2:], mode='bilinear', align_corners=True)
         final_edge_feature = torch.cat((edge_feature, layer4_edge_feature), 1)
         layer0_edge = self.tmp_edge_predict(final_edge_feature)
+        if self.edf_flag:
+            layer0_edge = self.output_zero(layer0_edge)
         layer0_edge = F.interpolate(layer0_edge, size=x.size()[2:], mode='bilinear', align_corners=True)
         
         '''Final Mirror Map'''
-        refine_rccl_map = torch.sigmoid(rccl_refine)
-        refine_ssf_map = torch.sigmoid(ssf_refine)
-        refine_sh_map = torch.sigmoid(sh_refine)
+        final_features = torch.cat((layer0_edge, layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict, layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict, sh4_predict, sh3_predict, sh2_predict, sh1_predict), 1) 
+
+        # component refine 
+        refine_rccl_predict = self.rccl_refine(final_features)
+        refine_ssf_predict = self.ssf_refine(final_features)
+        refine_sh_predict = self.sh_refine(final_features)
+        
+        refine_rccl_map = torch.sigmoid(refine_rccl_predict)
+        refine_ssf_map = torch.sigmoid(refine_ssf_predict)
+        refine_sh_map = torch.sigmoid(refine_sh_predict)
         boundary_map = torch.sigmoid(layer0_edge)
         
         refine_feat = torch.cat([refine_rccl_map, refine_ssf_map, refine_sh_map, boundary_map], 1)
         final_predict = self.refine(refine_feat)
         
-        return layer0_edge, final_predict
-    
+        # Return
+        rccl_layers = [layer4_rccl_predict, layer3_rccl_predict, layer2_rccl_predict, layer1_rccl_predict]
+        ssf_layers = [layer4_ssf_predict, layer3_ssf_predict, layer2_ssf_predict, layer1_ssf_predict]
+        sh_layers = [sh4_predict, sh3_predict, sh2_predict, sh1_predict]
+        others = [layer0_edge, final_predict]
+        
+        rccl_layers = [self.apply_sigmoid_if_needed(layer) for layer in rccl_layers]
+        ssf_layers = [self.apply_sigmoid_if_needed(layer) for layer in ssf_layers]
+        sh_layers = [self.apply_sigmoid_if_needed(layer) for layer in sh_layers]
+        others = [self.apply_sigmoid_if_needed(layer) for layer in others]
+        
+        return (*rccl_layers, *ssf_layers, *sh_layers, *others)
     
     def output_zero(self, x):
         return x * torch.zeros_like(x)
     
     def apply_sigmoid_if_needed(self, tensor):
         return torch.sigmoid(tensor) if not self.training else tensor
-    
 
 
