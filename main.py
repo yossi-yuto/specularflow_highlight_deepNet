@@ -15,14 +15,13 @@ from torchmetrics.classification import BinaryFBetaScore
 from torch.utils.data import ConcatDataset
 import matplotlib.pyplot as plt
 from datetime import datetime as dt
-from tqdm import tqdm
 
 from loss.dice_bce import LossComponent, Loss_Refine_EDF
-from model.network import Network
+from model.network_sub import Network
 from dataset import SSF_SH_Dataset
 from asset import visialize
 import earlystop
-from learning_component import train, val, test, plot_loss_gragh, model_param_reading, model_setting, load_rccl_ssf_sh_and_refine_params
+from learning_component import train, val, test, plot_loss_gragh, model_param_reading, model_setting, load_weights_partial
 
 
 def parse_args():
@@ -161,17 +160,21 @@ def main():
         model = Network().cuda()
         if opt.read_weight_path:
             result_root_check = check_weight_path(result_dir, opt.read_weight_path)
-
+        # Load parameters 
         rccl_param_path = os.path.join(result_root_check, "rccl.pth") 
         ssf_param_path = os.path.join(result_root_check, "ssf.pth") 
         sh_param_path = os.path.join(result_root_check, "sh.pth") 
-        model = load_rccl_ssf_sh_and_refine_params(model, rccl_param_path, ssf_param_path, sh_param_path)
+        model = load_weights_partial(model, rccl_param_path, 'rccl')
+        model = load_weights_partial(model, ssf_param_path, 'ssf')
+        model = load_weights_partial(model, sh_param_path, 'sh')
+        # Freeze
         model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
 
     elif opt.mode == "pmd":
-        model = Network(rccl_zero=False, ssf_zero=True, sh_zero=True, EDF_zero=False).cuda()
+        model = Network(pmd_learn=True).cuda()
         if opt.read_weight_path:
             result_root_check = check_weight_path(result_dir, opt.read_weight_path)
+            
         model = model_param_reading(model, os.path.join(result_root_check, "rccl.pth"), ["rccl"])
         model = model_setting(model, rccl_freeze=True, ssf_freeze=True, sh_freeze=True, EDF_freeze=False)
 
@@ -240,7 +243,7 @@ def main():
 
         with open(os.path.join(result_root, "eval.txt"), mode="a") as w: 
             w.write(f"{opt.mode}:\n")
-            w.write(f"Fbeta: {Fbeta}, MAE: {MAE}\n")
+            w.write("Fbeta: {:.5f}, MAE: {:.5f}\n".format(Fbeta, MAE))
     else:
         print("No learn and evaluate.")
     print("finished!")

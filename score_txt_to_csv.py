@@ -15,9 +15,34 @@ def parse_arg():
     return parser.parse_args()
 
 
+def txt_to_num(text):
+    lines = text.split('\n')
+    # Initialize variables to hold the scores
+    pmd_fbeta = 0.0
+    pmd_mae = 0.0
+    refine_fbeta = 0.0
+    refine_mae = 0.0
+
+    # Loop through the last 4 lines to extract the scores
+    for line in lines[-4:]:
+        if "pmd" in line:
+            continue
+        elif "refine" in line:
+            continue
+        elif "Fbeta" in line and "MAE" in line:
+            parts = line.split(",")
+            if "pmd" in lines[lines.index(line) - 1]:
+                pmd_fbeta = float(parts[0].split(":")[1].strip())
+                pmd_mae = float(parts[1].split(":")[1].strip())
+            elif "refine" in lines[lines.index(line) - 1]:
+                refine_fbeta = float(parts[0].split(":")[1].strip())
+                refine_mae = float(parts[1].split(":")[1].strip())
+    return pmd_fbeta, pmd_mae, refine_fbeta, refine_mae
+
+
 def main(args):
     # ヘッダーを書き込む
-    input_dir = args.input_dir
+    input_dir = args.input_dir    
     output_csv_path = args.output_file + ".csv"
     
     df = pd.DataFrame(columns=['type', 'ex_num' ,'PMD_Fbeta', 'PMD_MAE', 'SSFH_Fbeta', 'SSFH_MAE'])
@@ -29,8 +54,6 @@ def main(args):
         avg_pmd_mae = []
         avg_ssfh_fbeta = []
         avg_ssfh_mae = []
-        if type == 'coin_case':
-            continue
         
         for i, ex_num in enumerate(os.listdir(type_path)):
             ex_path = os.path.join(type_path, ex_num)
@@ -38,16 +61,16 @@ def main(args):
             if os.path.exists(txtfile_path):
                 with open(txtfile_path, 'r') as infile:
                     string = infile.read()
-                    parts = [item.strip() for item in re.split('[\,:\n]', string) if item != '']
+                    pmd_fbeta, pmd_mae, ssfh_fbeta, ssfh_mae = txt_to_num(string)
                     
-                    avg_pmd_fbeta.append(float(parts[-3]))
-                    avg_pmd_mae.append(float(parts[-1]))
-                    avg_ssfh_fbeta.append(float(parts[2]))
-                    avg_ssfh_mae.append(float(parts[4]))
+                    avg_pmd_fbeta.append(pmd_fbeta)
+                    avg_pmd_mae.append(pmd_mae)
+                    avg_ssfh_fbeta.append(ssfh_fbeta)
+                    avg_ssfh_mae.append(ssfh_mae)
                     if i == 0:
-                        df.loc[len(df.index)] = [type, ex_num, parts[-3], parts[-1], parts[2], parts[4]]
+                        df.loc[len(df.index)] = [type, ex_num, pmd_fbeta, pmd_mae, ssfh_fbeta, ssfh_mae]
                     else:
-                        df.loc[len(df.index)] = ['', ex_num, parts[-3], parts[-1], parts[2], parts[4]]
+                        df.loc[len(df.index)] = ['', ex_num, pmd_fbeta, pmd_mae, ssfh_fbeta, ssfh_mae]
             else:
                 print(f"No such a text file: {txtfile_path}")
         df.loc[len(df.index)] = ['', 'Avg', 

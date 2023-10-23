@@ -89,17 +89,27 @@ def val(dataloader, model, loss_fn, metrics_fn, output_path):
     m_refine_loss = val_refine_loss / len(dataloader)
     print(f"val_data\n loss: {m_loss:.5f}, refine_loss:{m_refine_loss:.5f}, score: {m_score:.5f}\n")
     # Plot graghs
-    num_graghs = len(pred)
+    num_pred = len(pred)
     col = 4
-    row = math.ceil((num_graghs + 3) / col)
+    row = math.ceil((num_pred + 3) / col)
     font_size = 36
     plt.figure(tight_layout=True, figsize=(20,30))
     
-    for i in range(num_graghs):
+    # pred is boundary and final predict
+    # for i in range(num_pred):
+    #     plt.subplot(row, col, i+1)
+    #     plt.imshow(torch.squeeze(pred[i]).cpu().numpy(), cmap="gray")
+    #     plt.axis('off')
+    #     if i == 0:
+    #         plt.title('boudary map')
+    #     elif i == (num_pred - 1):
+    #         plt.title('final map')
+    
+    for i in range(num_pred):
         pred_arr = torch.sigmoid(pred[i]).cpu()
         imgobject_pred = convert_tensor_to_pil(pred_arr)
         plt.subplot(row, col, i + 1)
-        if i < num_graghs:
+        if i < num_pred:
             plt.imshow(imgobject_pred, cmap='gray')
         if i < 4:
             plt.title(f"RCCL: {4 - i}", fontsize=font_size)
@@ -114,15 +124,15 @@ def val(dataloader, model, loss_fn, metrics_fn, output_path):
         else:
             pass
         
-    plt.subplot(row, col, num_graghs + 1)
+    plt.subplot(row, col, num_pred + 1)
     plt.imshow(rgb_img.squeeze(0).permute(1, 2, 0).contiguous())
     plt.title("image", fontsize=font_size)
-    plt.subplot(row, col, num_graghs + 2)
+    plt.subplot(row, col, num_pred + 2)
     plt.imshow(mask.view(416, 416).cpu(), cmap='gray')
     plt.title("mask", fontsize=font_size)
-    plt.subplot(row, col, num_graghs + 3)
+    plt.subplot(row, col, num_pred + 3)
     # Making masked image.
-    pred = pred_arr.squeeze(0).permute(1,2,0).numpy()
+    pred = pred[-1].cpu().squeeze(0).permute(1,2,0).numpy()
     rgb_img = rgb_img.squeeze(0).permute(1,2,0).numpy().astype(np.uint8)
     masking_img = (rgb_img * pred).astype(np.uint8)
     plt.imshow(masking_img)
@@ -174,9 +184,10 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
     with torch.no_grad():
         for img_path in tqdm(test_imgs):
             print(f"image name: {img_path}")
+            if os.path.basename(img_path) != "CIMG7860.jpg":
+                continue
             
-            # if os.path.basename(img_path) != "CIMG7899.jpg":
-            #     continue
+            
             
             # Load image
             img = Image.open(img_path)
@@ -189,26 +200,26 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             sv_var = hsv_trans(img.convert("HSV"))[1:,:,:].unsqueeze(0).cuda()
             # Predict
             origin_output_list = list(model((img_var.cuda(), sv_var.cuda())))
-            # origin_output_list = [torch.sigmoid(out_map) for out_map in origin_output_list]
-            
-            # for i in range(len(origin_output_list)):
-            #     print(f"origin_output_list[{i}_sig][400, 400]]: {origin_output_list[i][:, :, 400, 400]}")
-
-            # print("Raw value.")
-            # for i in range(len(origin_output_list)):
-            #     origin_output_list[i] = torch.sigmoid(origin_output_list[i])
-            #     print(f"origin_output_list[{i}_raw][400, 400]: {origin_output_list[i][:, :, 400, 400]}")
-            
-            
             # Post processing
             output_list = post_resize_and_convert(origin_output_list, resize=(h, w))
             print("Predict...")
-            
-            # pdb.set_trace()
-
-            # Save final predict map
+            # Save final mirror map
             output_file_path = os.path.join(save_dir, filename)
             print(f"file name: {output_file_path}")
+            
+            for i in range(len(output_list)):
+                if i < 4:
+                    output_file_path = f"mold_rccl{4 - i}.pdf"
+                elif i < 8:
+                    output_file_path = f"mold_ssf{8 - i}.pdf"
+                elif i < 12:
+                    output_file_path = f"mold_sh{12 - i}.pdf"
+                else:
+                    continue
+                Image.fromarray(output_list[i]).save(output_file_path)
+            pdb.set_trace()
+            
+            
             Image.fromarray(output_list[-1]).save(output_file_path)
             masking = (np.array(img.convert("RGB")) / 255.) * (output_list[-1][:,:,np.newaxis] / 255.)
 
@@ -220,15 +231,16 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             MAE_list.append(mean_absolute_error(true_1d, pred_1d))
             thres_final = np.zeros_like(output_list[-1])
             thres_final[output_list[-1] > (thres * 255.)] = 255
+            # maximum thresholding final mirror map
+            Image.fromarray(thres_final).save(output_file_path.replace(".png", "_maxF.png"))
+            
             # Gragh plot
             all_images = output_list + [img, mask, masking, thres_final]
             num_images = len(all_images)
-            
             col = 4
             row = math.ceil(num_images / col)
             font_size = 36
             plt.figure(tight_layout=True, figsize=(20, 30))
-            
             for i in range(num_images):
                 plt.subplot(row, col, i + 1)
                 title = ""
@@ -267,8 +279,6 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             plt.savefig(output_analysis_path)
             plt.close()
             
-            # pdb.set_trace()
-
         avg_f_beta = statistics.mean(max_Fbeta_list)
         avg_MAE = statistics.mean(MAE_list)
         std_fbeta = statistics.pvariance(max_Fbeta_list)
@@ -369,6 +379,13 @@ def load_rccl_ssf_sh_and_refine_params(model, rccl_param_path, ssf_param_path, s
 
         model.load_state_dict(selected_state_dict, strict=False)
 
+    return model
+
+
+def load_weights_partial(model, param_path, component='rccl'):
+    saved_state_dict = torch.load(param_path)
+    selected_state_dict = {k: v for k, v in saved_state_dict.items() if component in k}
+    model.load_state_dict(selected_state_dict, strict=False)
     return model
 
 # Print unfrozen_parameters.
