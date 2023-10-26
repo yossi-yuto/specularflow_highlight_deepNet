@@ -331,7 +331,6 @@ class Network(nn.Module):
         self.edf_net = EDF_module()
         
         """ refine """
-        self.pmd_refine = nn.Conv2d(2, 1, 1, 1, 0)
         self.refine = nn.Conv2d(4, 1, 1, 1, 0)
         
         for m in self.modules():
@@ -363,11 +362,11 @@ class Network(nn.Module):
             high_feature = torch.cat([rccl_cbam, self.output_zero(rccl_cbam), self.output_zero(rccl_cbam)], 1)
             boundary = self.edf_net(layer1, high_feature)
             boundary = F.interpolate(boundary, size=x.size()[2:], mode='bilinear', align_corners=True)
-            final_predict = self.refine(torch.cat([torch.sigmoid(rccl_refine), torch.sigmoid(boundary)], 1))
+            
             if self.training:
-                return boundary, final_predict
+                return boundary, rccl_refine
             # test mode
-            return torch.sigmoid(boundary), torch.sigmoid(final_predict)
+            return torch.sigmoid(boundary), torch.sigmoid(rccl_refine)
         
         # SSF network
         if self.ssf_learn:
@@ -395,6 +394,7 @@ class Network(nn.Module):
         
         refine_feat = torch.cat([refine_rccl_map, refine_ssf_map, refine_sh_map, boundary_map], 1)
         final_predict = self.refine(refine_feat)
+        # final_predict = torch.mean(refine_feat, dim=1, keepdim=True)
         
         if self.training:
             return boundary, final_predict
@@ -410,6 +410,7 @@ class Network(nn.Module):
             others = [self.apply_sigmoid_if_needed(layer) for layer in others]
     
         return (*rccl_layers, *ssf_layers, *sh_layers, *others, refine_rccl_map, refine_ssf_map, refine_sh_map)
+        # return torch.sigmoid(boundary), final_predict
     
     def output_zero(self, x):
         return x * torch.zeros_like(x)
