@@ -187,8 +187,6 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             if os.path.basename(img_path) != "CIMG7860.jpg":
                 continue
             
-            
-            
             # Load image
             img = Image.open(img_path)
             filename = os.path.basename(img_path).replace(".jpg", ".png")
@@ -200,14 +198,18 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
             sv_var = hsv_trans(img.convert("HSV"))[1:,:,:].unsqueeze(0).cuda()
             # Predict
             origin_output_list = list(model((img_var.cuda(), sv_var.cuda())))
+            
             # Post processing
             output_list = post_resize_and_convert(origin_output_list, resize=(h, w))
             print("Predict...")
             # Save final mirror map
             output_file_path = os.path.join(save_dir, filename)
             print(f"file name: {output_file_path}")
-            
-            for i in range(len(output_list)):
+            Image.fromarray(output_list[-3]).save("mold_rccl_refine.pdf")
+            Image.fromarray(output_list[-2]).save("mold_ssf_refine.pdf")
+            Image.fromarray(output_list[-1]).save("mold_sh_refine.pdf")
+            pdb.set_trace()
+            for i in range(len(output_list[:-3])):
                 if i < 4:
                     output_file_path = f"mold_rccl{4 - i}.pdf"
                 elif i < 8:
@@ -217,9 +219,8 @@ def test(test_imgs, mask_dir, model, save_dir, read_best_path):
                 else:
                     continue
                 Image.fromarray(output_list[i]).save(output_file_path)
+            
             pdb.set_trace()
-            
-            
             Image.fromarray(output_list[-1]).save(output_file_path)
             masking = (np.array(img.convert("RGB")) / 255.) * (output_list[-1][:,:,np.newaxis] / 255.)
 
